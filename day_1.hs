@@ -18,7 +18,14 @@ newtype Fuel = Fuel Integer
   deriving (Eq, Show, Num, Real, Integral, Enum, Ord)
 
 fuelRequired :: Mass -> Fuel
-fuelRequired = fromIntegral >>> (/ 3) >>> floor >>> (\x -> x - 2) >>> Fuel
+fuelRequired mass = Fuel $ fromIntegral $ sum $ calculate mass
+  where
+    calculateOnce = fromIntegral >>> (/ 3) >>> floor >>> (\x -> x - 2)
+    calculate x
+      | m > 0 = m : calculate m
+      | otherwise = []
+      where
+        m = calculateOnce x
 
 main :: IO ()
 main = do
