@@ -52,13 +52,14 @@ line = do
 paths :: Parser [Path]
 paths = do
   ps <- filter (not . null) <$> (line `sepBy` (char ',')) `sepBy` newline
+  -- tag each path with a key
   pure $ map (\(k, ls) -> map (\(Line _ d i) -> Line k d i) ls) $ zip [0..] ps
 
 applyDirection :: Direction -> Coord -> Coord
-applyDirection U = \(x,y) -> (x,y+1)
-applyDirection D = \(x,y) -> (x,y-1)
-applyDirection L = \(x,y) -> (x-1,y)
-applyDirection R = \(x,y) -> (x+1,y)
+applyDirection U (x, y) = (x,   y+1)
+applyDirection D (x, y) = (x,   y-1)
+applyDirection L (x, y) = (x-1, y)
+applyDirection R (x, y) = (x+1, y)
 
 newtype Index = Index { getIndex :: Int }
   deriving (Eq, Ix, Ord, Num, Enum)
@@ -72,6 +73,7 @@ type CoordSteps = (Int, Coord)
 
 type Plane = Map Coord [(Key, Int)]
 
+-- adjust the value of the plane map
 addKey :: Key -> Int -> Maybe [(Key, Int)] -> Maybe [(Key, Int)]
 addKey k steps Nothing = Just [(k, steps)]
 addKey k steps (Just ks) = case lookup k ks of
