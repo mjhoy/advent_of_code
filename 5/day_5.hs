@@ -119,12 +119,20 @@ getInput = do
 output :: Int -> E ()
 output i = liftIO $ putStrLn (show i)
 
+jump :: Index -> E ()
+jump i = do
+  (_, program) <- get
+  put (i, program)
+
 execute :: E ()
 execute = do
   val <- peek Immediate 0
   let opcode = val `mod` 100
   let modeDigits = map (`mod` 10) $ takeWhile (> 0) $ iterate (`div` 10) $ val `div` 100
   modes <- mapM digit2Mode modeDigits
+
+  -- traceM $ "opcode: " ++ show opcode
+  -- traceM $ "digits: " ++ show modeDigits
 
   case (opcode, modes ++ repeat Position) of
 
@@ -139,6 +147,32 @@ execute = do
 
     (4, (m1:_)) ->
       showAdvance m1 1 >> execute
+
+    (5, (m1:m2:_)) -> do
+      v1 <- peek m1 1
+      v2 <- peek m2 2
+      if v1 /= 0
+        then jump (Index v2) >> execute
+        else advance 3 >> execute
+
+    (6, (m1:m2:_)) -> do
+      v1 <- peek m1 1
+      v2 <- peek m2 2
+      if v1 == 0
+        then jump (Index v2) >> execute
+        else advance 3 >> execute
+
+    (7, (m1:m2:m3:_)) -> do
+      r <- (<) <$> peek m1 1 <*> peek m2 2
+      let v = if r then 1 else 0
+      writeAdvance m3 3 v
+      execute
+
+    (8, (m1:m2:m3:_)) -> do
+      r <- (==) <$> peek m1 1 <*> peek m2 2
+      let v = if r then 1 else 0
+      writeAdvance m3 3 v
+      execute
 
     (99,_) -> pure ()
 
@@ -165,6 +199,8 @@ main = do
     (file:_) -> do
       contents <- decodeUtf8 <$> BS.readFile file
       res <- runE contents execute
-      putStrLn "[Program finished]"
+      case fst res of
+        Right _ -> putStrLn "[Program complete]"
+        Left e -> putStrLn $ show e
       -- putStrLn $ show $ fst res
       -- putStrLn $ show $ snd res
