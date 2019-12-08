@@ -20,7 +20,7 @@ import           Text.Read (readMaybe)
 -- i could keep building off day_2, but i will probably just rewrite.
 
 usage :: IO ()
-usage = putStrLn "usage: runhaskell day_4.hs <program_file>"
+usage = putStrLn "usage: runhaskell day_5.hs <program_file>"
 
 newtype Index = Index Int
   deriving (Eq, Ix, Ord, Num, Enum)
@@ -103,15 +103,19 @@ peek m index = resolveRelative index >>= peek' m
 write :: Mode -> Int -> Index -> E ()
 write m v i = resolveRelative i >>= write' m v
 
+jump :: Index -> E ()
+jump i = do
+  (_, program) <- get
+  put (i, program)
+
 advance :: Index -> E ()
-advance n = do
-  (pointer, program) <- get
-  put (pointer + n, program)
+advance n = get >>= jump . (+ n) . fst
 
 getInput :: E Int
 getInput = do
-  liftIO $ putStr "Input: "
-  res <- liftIO getLine
+  res <- liftIO $ do
+    putStr "Input: "
+    getLine
   case readMaybe res of
     Just x -> pure x
     Nothing -> throwError $ BadInput res
@@ -119,21 +123,17 @@ getInput = do
 output :: Int -> E ()
 output i = liftIO $ putStrLn (show i)
 
-jump :: Index -> E ()
-jump i = do
-  (_, program) <- get
-  put (i, program)
-
 execute :: E ()
 execute = do
   val <- peek Immediate 0
   let opcode = val `mod` 100
-  let modeDigits = map (`mod` 10) $ takeWhile (> 0) $ iterate (`div` 10) $ val `div` 100
+      modeDigits = rightToLeftDigits (val `div` 100)
   modes <- mapM digit2Mode modeDigits
 
   -- traceM $ "opcode: " ++ show opcode
   -- traceM $ "digits: " ++ show modeDigits
 
+  -- the default mode is Position
   case (opcode, modes ++ repeat Position) of
 
     (1, (m1:m2:m3:_)) ->
@@ -185,6 +185,10 @@ execute = do
       digit2Mode 1 = pure Immediate
       digit2Mode n = throwError $ UnknownMode n
 
+      -- 5432 -> [2,3,4,5]
+      rightToLeftDigits :: Int -> [Int]
+      rightToLeftDigits n = map (`mod` 10) $ takeWhile (> 0) $ iterate (`div` 10) $ n
+
       writeAdvance :: Mode -> Index -> Int -> E ()
       writeAdvance m i v = write m v i >> advance (i + 1)
 
@@ -201,6 +205,6 @@ main = do
       res <- runE contents execute
       case fst res of
         Right _ -> putStrLn "[Program complete]"
-        Left e -> putStrLn $ show e
+        Left e  -> putStrLn $ show e
       -- putStrLn $ show $ fst res
       -- putStrLn $ show $ snd res
