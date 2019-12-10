@@ -5,6 +5,7 @@ import           System.Environment (getArgs)
 import           Data.Map (Map)
 import qualified Data.Map.Strict as M
 import           Data.List (foldl')
+import           Data.Maybe (fromMaybe)
 
 import           Text.Parsec.String (Parser)
 import           Text.Parsec.Char (char, newline, digit, letter)
@@ -44,6 +45,25 @@ countOrbits os = sum $ map countSingle allOrbited
       let kOrbits = maybe [] id (M.lookup k os)
       in length kOrbits + (sum $ map countSingle kOrbits)
 
+minimumDef :: Ord a => a -> [a] -> a
+minimumDef d [] = d
+minimumDef _ xs = minimum xs
+
+countOrbitalTransfer :: Orbits -> Orbits -> String -> String -> Int
+countOrbitalTransfer orbitedByInfo orbitsAroundInfo from to = walk (-1) from (allPaths from)
+  where
+    allPaths k = osBy ++ osAround
+      where
+        osBy     = fromMaybe [] $ M.lookup k orbitedByInfo
+        osAround = fromMaybe [] $ M.lookup k orbitsAroundInfo
+    walk :: Int -> String -> [String] -> Int
+    walk steps current nextPaths
+      | to `elem` nextPaths = steps
+      | otherwise           = minimumDef maxBound $ map nextWalk nextPaths
+      where
+        nextWalk :: String -> Int
+        nextWalk k = walk (steps + 1) k (filter (/= current) $ allPaths k)
+
 main :: IO ()
 main = do
   args <- getArgs
@@ -53,6 +73,9 @@ main = do
       str <- readFile file
       case (parse orbitedByAll file str) of
         Right os -> do
-          let orbits = foldl' (\acc o -> insertOrbit o acc) M.empty os
-          putStrLn $ show $ countOrbits orbits
+          let
+            osBy     = foldl' (\acc (a,b) -> insertOrbit (a,b) acc) M.empty os
+            osAround = foldl' (\acc (a,b) -> insertOrbit (b,a) acc) M.empty os
+          putStrLn $ "all orbits: " ++ (show $ countOrbits osAround)
+          putStrLn $ "orbital transfers: " ++ (show $ countOrbitalTransfer osBy osAround "SAN" "YOU")
         Left e -> putStrLn $ show e
